@@ -3,6 +3,8 @@
 **Focus**: Rental Search, Supporting Metadata (Filters), Pagination, and Property Detail Retrieval  
 **Status**: Completely reverse-engineered, validated, and reproducible without authentication.
 
+**TLS validation**: HTML and JSON requests use HTTPX's default certificate and hostname verification. Certificate validation failures surface as `HttpTransportError`; the client does not disable TLS verification.
+
 ---
 
 ## 1. System Overview & Architecture

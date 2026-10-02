@@ -1,7 +1,9 @@
 """HTTP transport abstraction with Mod_Security header compliance."""
 
-from typing import Any, Dict, Protocol
+from typing import Any, Protocol
+
 import httpx
+
 from arthuso.domain.exceptions import HttpTransportError
 from arthuso.infrastructure.endpoints import BASE_URL, DEFAULT_HEADERS
 
@@ -9,11 +11,11 @@ from arthuso.infrastructure.endpoints import BASE_URL, DEFAULT_HEADERS
 class HttpTransportProtocol(Protocol):
     """Protocol for HTTP client operations."""
 
-    def get_html(self, path_or_url: str, params: Dict[str, Any]) -> str:
+    def get_html(self, path_or_url: str, params: dict[str, Any]) -> str:
         """Executes GET request returning HTML response string."""
         ...
 
-    def get_json(self, path_or_url: str, params: Dict[str, Any]) -> Any:
+    def get_json(self, path_or_url: str, params: dict[str, Any]) -> Any:
         """Executes GET request returning parsed JSON data."""
         ...
 
@@ -26,12 +28,12 @@ class HttpxTransport:
         self._timeout = timeout
 
     def _resolve_url(self, path_or_url: str) -> str:
-        if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        if path_or_url.startswith(("http://", "https://")):
             return path_or_url
         clean_path = path_or_url.lstrip("/")
         return f"{self._base_url}/{clean_path}"
 
-    def get_html(self, path_or_url: str, params: Dict[str, Any]) -> str:
+    def get_html(self, path_or_url: str, params: dict[str, Any]) -> str:
         """Executes GET request and returns HTML text."""
         target_url = self._resolve_url(path_or_url)
         try:
@@ -39,7 +41,6 @@ class HttpxTransport:
                 headers=DEFAULT_HEADERS,
                 timeout=self._timeout,
                 follow_redirects=True,
-                verify=False,
             ) as client:
                 response = client.get(target_url, params=params)
                 self._check_status(response)
@@ -47,7 +48,7 @@ class HttpxTransport:
         except httpx.HTTPError as err:
             raise HttpTransportError(f"HTTP request failed: {err}") from err
 
-    def get_json(self, path_or_url: str, params: Dict[str, Any]) -> Any:
+    def get_json(self, path_or_url: str, params: dict[str, Any]) -> Any:
         """Executes GET request and returns parsed JSON object."""
         target_url = self._resolve_url(path_or_url)
         try:
@@ -55,7 +56,6 @@ class HttpxTransport:
                 headers=DEFAULT_HEADERS,
                 timeout=self._timeout,
                 follow_redirects=True,
-                verify=False,
             ) as client:
                 response = client.get(target_url, params=params)
                 self._check_status(response)
@@ -66,5 +66,6 @@ class HttpxTransport:
     def _check_status(self, response: httpx.Response) -> None:
         if response.status_code >= 400:
             raise HttpTransportError(
-                f"Server returned error code {response.status_code}: {response.text[:200]}"
+                f"Server returned error code {response.status_code}: "
+                f"{response.text[:200]}"
             )
