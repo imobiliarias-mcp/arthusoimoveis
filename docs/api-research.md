@@ -107,7 +107,7 @@ Executes search based on query parameters and returns page 1 of results.
     - Post ID: `data-listid="{id}"` and `data-hz-id="hz-{id}"`
     - Embedded photos: `data-images='[{"image":"url","alt":"","width":592,"height":444},...]'`
     - Title: `.item-title a`
-    - Link: `.item-title a['href']`
+    - Link: `.item-title a['href']`; `PropertySummary.detail_url` preserves the original card `href`, and `PropertySummary.url` resolves relative or protocol-relative values against the public site origin `https://arthusoimoveis.com.br/`. The resolved field rejects malformed hosts, credentials, WordPress API/search routes, and image files.
     - Price: `.item-price` (e.g. `R$ 950,00`)
     - Bedrooms: `.h-beds .hz-figure`
     - Bathrooms: `.h-baths .hz-figure`
@@ -286,6 +286,8 @@ DEFAULT_HEADERS = {
 ## 6. MCP Module Boundary Design
 
 The reverse-engineered functionality is organized into clean, reusable Python modules conforming to Object Calisthenics:
+
+- Search results retain the legacy `detail_url` and serialize an equivalent absolute public `url`; `PropertyCollection.to_dictionary()` also reports `returned_count`. The existing research runner prints each result as `Link: <URL>`. Link resolution uses the public portal origin and never triggers an additional detail request.
 
 - **Domain Layer (`arthuso.domain`)**:
   - `primitives.py`: Strongly typed Value Objects with fail-fast validation (`PropertyId`, `PropertyCode`, `RentalPrice`, `CitySlug`, `NeighborhoodSlug`, `PropertyTypeSlug`, `TransactionStatus`, `BedroomCount`, `BathroomCount`, `PageNumber`, `SortOrder`).

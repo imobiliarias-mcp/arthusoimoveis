@@ -11,6 +11,7 @@ from arthuso.domain.collections import (
 )
 from arthuso.domain.exceptions import PropertyNotFoundError
 from arthuso.infrastructure.endpoints import (
+    BASE_URL,
     PROPERTIES_PATH,
     PROPERTY_CITY_PATH,
     PROPERTY_AREA_PATH,
@@ -23,6 +24,40 @@ from arthuso.infrastructure.deserializer import ResponseDeserializer
 from arthuso.application.url_parser import FrontendUrlParser
 
 
+class RentalResponseParser:
+    """Coordinate parsing of search HTML and property detail JSON."""
+
+    def __init__(
+        self, deserializer: ResponseDeserializer, public_base_url: str
+    ) -> None:
+        self._deserializer = deserializer
+        self._search_parser = SearchHtmlParser(public_base_url)
+
+    def parse_search(self, html_response: str) -> PropertyCollection:
+        """Parse listing cards into a typed property collection."""
+        return self._search_parser.parse_listings(html_response)
+
+    def parse_detail(self, payload: dict[str, Any]) -> PropertyDetail:
+        """Deserialize a property detail payload into its domain model."""
+        return self._deserializer.deserialize_property_detail(payload)
+
+    def parse_cities(self, payload: list[dict[str, Any]]) -> CityCollection:
+        """Deserialize a city catalog into its typed collection."""
+        return self._deserializer.deserialize_cities(payload)
+
+    def parse_neighborhoods(
+        self, payload: list[dict[str, Any]]
+    ) -> NeighborhoodCollection:
+        """Deserialize a neighborhood catalog into its typed collection."""
+        return self._deserializer.deserialize_neighborhoods(payload)
+
+    def parse_property_types(
+        self, payload: list[dict[str, Any]]
+    ) -> PropertyTypeCollection:
+        """Deserialize a property type catalog into its typed collection."""
+        return self._deserializer.deserialize_property_types(payload)
+
+
 class RentalResearchService:
     """Central service coordinator for rental research MCP integration."""
 
@@ -30,9 +65,10 @@ class RentalResearchService:
         self,
         http_transport: HttpTransportProtocol,
         deserializer: ResponseDeserializer,
+        public_base_url: str = BASE_URL,
     ) -> None:
         self._http_transport = http_transport
-        self._deserializer = deserializer
+        self._response_parser = RentalResponseParser(deserializer, public_base_url)
 
     def search_rentals(
         self, criteria: SearchCriteria, pagination: PaginationSpec
@@ -41,8 +77,7 @@ class RentalResearchService:
         builder = SearchQueryBuilder()
         path, params = builder.build_request(criteria, pagination)
         html_response = self._http_transport.get_html(path, params)
-        parser = SearchHtmlParser()
-        return parser.parse_listings(html_response)
+        return self._response_parser.parse_search(html_response)
 
     def search_by_url(self, target_url: str) -> PropertyCollection:
         """Parses target URL and executes rental search."""
@@ -54,7 +89,7 @@ class RentalResearchService:
         """Retrieves full property details by WordPress post ID."""
         detail_path = f"{PROPERTIES_PATH}/{post_id.value}"
         raw_data = self._http_transport.get_json(detail_path, {"_embed": "true"})
-        return self._deserializer.deserialize_property_detail(raw_data)
+        return self._response_parser.parse_detail(raw_data)
 
     def get_property_by_slug(self, slug: str) -> PropertyDetail:
         """Retrieves full property details by slug."""
@@ -63,22 +98,22 @@ class RentalResearchService:
         if not raw_list:
             raise PropertyNotFoundError(f"Property with slug {slug} not found")
         first_item = raw_list[0]
-        return self._deserializer.deserialize_property_detail(first_item)
+        return self._response_parser.parse_detail(first_item)
 
     def get_cities(self) -> CityCollection:
         """Retrieves all available cities."""
         params: Dict[str, Any] = {"per_page": 100}
         raw_list = self._http_transport.get_json(PROPERTY_CITY_PATH, params)
-        return self._deserializer.deserialize_cities(raw_list)
+        return self._response_parser.parse_cities(raw_list)
 
     def get_neighborhoods(self) -> NeighborhoodCollection:
         """Retrieves all available neighborhoods."""
         params: Dict[str, Any] = {"per_page": 100}
         raw_list = self._http_transport.get_json(PROPERTY_AREA_PATH, params)
-        return self._deserializer.deserialize_neighborhoods(raw_list)
+        return self._response_parser.parse_neighborhoods(raw_list)
 
     def get_property_types(self) -> PropertyTypeCollection:
         """Retrieves all available property types."""
         params: Dict[str, Any] = {"per_page": 100}
         raw_list = self._http_transport.get_json(PROPERTY_TYPE_PATH, params)
-        return self._deserializer.deserialize_property_types(raw_list)
+        return self._response_parser.parse_property_types(raw_list)

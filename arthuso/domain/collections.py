@@ -23,6 +23,13 @@ class PropertyCollection:
         """Returns True if the collection contains no properties."""
         return len(self._items) == 0
 
+    def to_dictionary(self) -> dict[str, object]:
+        """Serialize listing items and the current result count."""
+        return {
+            "items": [item.to_dictionary() for item in self._items],
+            "returned_count": len(self._items),
+        }
+
 
 class CityCollection:
     """First-class collection wrapping city taxonomy terms."""

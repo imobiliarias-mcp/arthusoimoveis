@@ -53,7 +53,7 @@ def main() -> int:
         print(f"      Bedrooms: {prop.bedrooms} | Bathrooms: {prop.bathrooms}")
         print(f"      Type: {prop.property_type}")
         print(f"      Gallery Images: {len(prop.images)} embedded photos")
-        print(f"      URL: {prop.detail_url}")
+        print(f"      Link: {prop.url or prop.detail_url}")
 
     print("\n[3] Discovering Filter Taxonomies...")
     cities = service.get_cities()
