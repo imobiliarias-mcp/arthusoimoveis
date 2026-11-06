@@ -133,7 +133,7 @@ class RentalResearchService:
         return self._response_parser.parse_property_types(raw_list)
 
 
-def _gallery_ids(meta: Dict[str, Any]) -> List[str]:
+def _gallery_ids(meta: dict[str, Any]) -> list[str]:
     """Return the numeric attachment ids of the property gallery, in display order."""
     raw_ids = meta.get("fave_property_images")
     if not isinstance(raw_ids, list):
