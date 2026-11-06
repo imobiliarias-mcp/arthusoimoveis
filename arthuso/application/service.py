@@ -1,5 +1,6 @@
 """Primary service facade implementing the central Rental Research MCP boundary."""
 
+from dataclasses import replace
 from typing import Any, Dict, List
 from arthuso.domain.primitives import PropertyId
 from arthuso.domain.models import SearchCriteria, PaginationSpec, PropertyDetail
@@ -12,6 +13,7 @@ from arthuso.domain.collections import (
 from arthuso.domain.exceptions import PropertyNotFoundError
 from arthuso.infrastructure.endpoints import (
     BASE_URL,
+    MEDIA_PATH,
     PROPERTIES_PATH,
     PROPERTY_CITY_PATH,
     PROPERTY_AREA_PATH,
@@ -89,7 +91,7 @@ class RentalResearchService:
         """Retrieves full property details by WordPress post ID."""
         detail_path = f"{PROPERTIES_PATH}/{post_id.value}"
         raw_data = self._http_transport.get_json(detail_path, {"_embed": "true"})
-        return self._response_parser.parse_detail(raw_data)
+        return self._with_gallery(self._response_parser.parse_detail(raw_data))
 
     def get_property_by_slug(self, slug: str) -> PropertyDetail:
         """Retrieves full property details by slug."""
@@ -98,7 +100,19 @@ class RentalResearchService:
         if not raw_list:
             raise PropertyNotFoundError(f"Property with slug {slug} not found")
         first_item = raw_list[0]
-        return self._response_parser.parse_detail(first_item)
+        return self._with_gallery(self._response_parser.parse_detail(first_item))
+
+    def _with_gallery(self, detail: PropertyDetail) -> PropertyDetail:
+        """Attach gallery photo URLs resolved in one media request from the attachment ids."""
+        image_ids = _gallery_ids(detail.meta)
+        if not image_ids:
+            return detail
+        raw_media = self._http_transport.get_json(
+            MEDIA_PATH, {"include": ",".join(image_ids), "per_page": 100}
+        )
+        urls_by_id = {str(item["id"]): item["source_url"] for item in raw_media if item.get("source_url")}
+        images = [urls_by_id[image_id] for image_id in image_ids if image_id in urls_by_id]
+        return replace(detail, summary=replace(detail.summary, images=images))
 
     def get_cities(self) -> CityCollection:
         """Retrieves all available cities."""
@@ -117,3 +131,11 @@ class RentalResearchService:
         params: Dict[str, Any] = {"per_page": 100}
         raw_list = self._http_transport.get_json(PROPERTY_TYPE_PATH, params)
         return self._response_parser.parse_property_types(raw_list)
+
+
+def _gallery_ids(meta: Dict[str, Any]) -> List[str]:
+    """Return the numeric attachment ids of the property gallery, in display order."""
+    raw_ids = meta.get("fave_property_images")
+    if not isinstance(raw_ids, list):
+        return []
+    return [str(value) for value in raw_ids if str(value).isdigit()]
