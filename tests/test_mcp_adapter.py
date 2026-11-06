@@ -36,11 +36,20 @@ PROPERTY_JSON: dict[str, Any] = {
         "fave_property_price": ["950"],
         "fave_property_bedrooms": ["2"],
         "fave_property_bathrooms": ["1"],
+        "fave_property_images": ["40464", "40465"],
     },
     "_embedded": {"wp:term": []},
 }
 
 CITIES_JSON = [{"id": 82, "name": "Timóteo", "slug": "timoteo", "count": 346}]
+MEDIA_JSON = [
+    {"id": 40465, "source_url": "https://arthusoimoveis.com.br/wp-content/uploads/2-b.jpeg"},
+    {"id": 40464, "source_url": "https://arthusoimoveis.com.br/wp-content/uploads/1-a.jpeg"},
+]
+GALLERY_URLS = [
+    "https://arthusoimoveis.com.br/wp-content/uploads/1-a.jpeg",
+    "https://arthusoimoveis.com.br/wp-content/uploads/2-b.jpeg",
+]
 
 
 class FakeTransport:
@@ -54,6 +63,8 @@ class FakeTransport:
         """Return REST payloads for detail, slug lookup and taxonomy endpoints."""
         if "property_city" in path_or_url:
             return CITIES_JSON
+        if path_or_url.endswith("/wp-json/wp/v2/media"):
+            return MEDIA_JSON
         if path_or_url.endswith("/wp-json/wp/v2/properties/39790"):
             return PROPERTY_JSON
         if params.get("slug") == "apartamento-centro-timoteo":
@@ -97,6 +108,7 @@ def test_property_detail_by_numeric_id_uses_service_summary_and_description():
     assert detail["bathrooms"] == 1
     assert detail["description"] == "<p>Excelente apartamento</p>"
     assert detail["url"] == "https://arthusoimoveis.com.br/property/apartamento-centro-timoteo/"
+    assert detail["photos"] == GALLERY_URLS
 
 
 def test_property_detail_by_slug_fetches_through_slug_lookup():
@@ -105,6 +117,7 @@ def test_property_detail_by_slug_fetches_through_slug_lookup():
     assert detail["id"] == "apartamento-centro-timoteo"
     assert detail["title"] == "Apartamento Centro"
     assert detail["description"] == "<p>Excelente apartamento</p>"
+    assert detail["photos"] == GALLERY_URLS
 
 
 def test_facets_expose_real_taxonomy_term_fields():
