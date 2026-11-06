@@ -51,10 +51,10 @@ class ArthusoMcpAdapter:
         """Execute a rental property search for an MCP tool call."""
         criteria = self._build_criteria(city, max_price, bedrooms)
         pagination = PaginationSpec(page=PageNumber(page))
-        results = self._service.search(criteria, pagination)
+        results = self._service.search_rentals(criteria, pagination)
         return self._format_collection(results)
 
-    def _format_collection(self, collection: list[Any]) -> dict[str, Any]:
+    def _format_collection(self, collection: Any) -> dict[str, Any]:
         """Format collection into standard dictionary."""
         return {
             "provider": "arthusoimoveis",
@@ -63,39 +63,55 @@ class ArthusoMcpAdapter:
         }
 
     def _format_item(self, item: Any) -> dict[str, Any]:
-        """Format individual listing item."""
-        pid = item.post_id.value if hasattr(item, "post_id") and item.post_id else ""
+        """Format a PropertySummary into the standard listing dictionary."""
         return {
-            "id": str(pid),
-            "title": getattr(item, "title", ""),
-            "price": getattr(item, "price_text", ""),
-            "bedrooms": getattr(item, "bedrooms", 0),
-            "bathrooms": getattr(item, "bathrooms", 0),
-            "property_type": getattr(item, "property_type", ""),
-            "url": getattr(item, "url", "") or getattr(item, "detail_url", ""),
-            "photos": getattr(item, "images", []),
+            "id": self._post_id_text(item.post_id),
+            "title": item.title,
+            "price": item.price_text,
+            "bedrooms": item.bedrooms or 0,
+            "bathrooms": item.bathrooms or 0,
+            "property_type": item.property_type or "",
+            "url": item.url or item.detail_url,
+            "photos": list(item.images),
         }
+
+    def _post_id_text(self, post_id: PropertyId | None) -> str:
+        """Return the WordPress post id as text, or an empty string when absent."""
+        if post_id is None:
+            return ""
+        return post_id.as_string()
 
     def get_property_detail(self, property_code: str) -> dict[str, Any]:
         """Retrieve complete property detail for an MCP tool call."""
-        pid = PropertyId(int(property_code)) if property_code.isdigit() else property_code
-        detail = self._service.get_details(pid)
+        detail = self._fetch_detail(property_code)
+        summary = detail.summary
         return {
             "id": str(property_code),
-            "title": getattr(detail, "title", ""),
-            "description": getattr(detail, "description", ""),
-            "price": getattr(detail, "price_text", ""),
-            "bedrooms": getattr(detail, "bedrooms", 0),
-            "bathrooms": getattr(detail, "bathrooms", 0),
-            "property_type": getattr(detail, "property_type", ""),
-            "url": getattr(detail, "url", ""),
-            "photos": getattr(detail, "images", []),
+            "title": summary.title,
+            "description": detail.description,
+            "price": summary.price_text,
+            "bedrooms": summary.bedrooms or 0,
+            "bathrooms": summary.bathrooms or 0,
+            "property_type": summary.property_type or "",
+            "url": summary.url or summary.detail_url,
+            "photos": list(summary.images),
         }
+
+    def _fetch_detail(self, property_code: str) -> Any:
+        """Fetch a detail by numeric WordPress id, otherwise by slug."""
+        if property_code.isdigit():
+            return self._service.get_property_by_id(PropertyId(int(property_code)))
+        return self._service.get_property_by_slug(property_code)
 
     def get_facets(self) -> dict[str, Any]:
         """Retrieve available search facets for an MCP tool call."""
         cities = self._service.get_cities()
-        return {"cities": [{"name": getattr(c, "name", ""), "label": getattr(c, "label", "")} for c in cities]}
+        return {
+            "cities": [
+                {"name": city.name, "slug": city.slug, "count": city.count}
+                for city in cities
+            ]
+        }
 
     def get_provider_info(self) -> dict[str, Any]:
         """Retrieve metadata about this rental provider adapter."""
